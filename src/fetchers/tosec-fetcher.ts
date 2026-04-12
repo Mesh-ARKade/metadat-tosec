@@ -13,6 +13,7 @@ import { VersionTracker } from '../core/version-tracker.js';
 export class TosecFetcher extends AbstractFetcher {
   private browser: Browser | null = null;
   private sourceName: string = 'tosec';
+  private currentPage: Page | null = null;
 
   constructor(versionTracker: VersionTracker) {
     super(versionTracker, { maxRetries: 3, retryDelay: 5000 });
@@ -38,25 +39,23 @@ export class TosecFetcher extends AbstractFetcher {
         timeout: 30000,
       });
 
-      // Find the latest release date from the page
-      // TOSEC uses dates in format YYYY-MM-DD in their download links
-      const dateMatch = await page.evaluate(() => {
-        // Look for date pattern in the page
-        const links = Array.from(document.querySelectorAll('a[href*="/downloads/"]'));
-        for (const link of links) {
-          const href = link.getAttribute('href') || '';
-          // Match patterns like /2025-01-15/ or tosec-v2025-01-15
-          const match = href.match(/(\d{4}-\d{2}-\d{2})/);
+      // Find the latest release date - look for heading with date format
+      const versionDate = await page.evaluate(() => {
+        // Look for the date in the table showing current version
+        const cells = Array.from(document.querySelectorAll('td'));
+        for (const cell of cells) {
+          const text = cell.textContent || '';
+          const match = text.match(/(\d{4}-\d{2}-\d{2})/);
           if (match) return match[1];
         }
         return null;
       });
 
-      if (!dateMatch) {
+      if (!versionDate) {
         throw new Error('Could not find version date on TOSEC downloads page');
       }
 
-      return dateMatch;
+      return versionDate;
     } finally {
       // Don't close browser here - reuse it
     }
@@ -77,28 +76,41 @@ export class TosecFetcher extends AbstractFetcher {
         timeout: 30000,
       });
 
-      // Get all the download links from the page
-      const downloadLinks = await page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll('a[href*="/downloads/"]'));
-        return links
-          .map((link) => ({
-            href: link.getAttribute('href'),
-            text: link.textContent,
-          }))
-          .filter((l) => l.href && l.href.endsWith('.zip'));
+      // Get the current version date from the status table
+      const versionDate = await page.evaluate(() => {
+        const cells = Array.from(document.querySelectorAll('td'));
+        for (const cell of cells) {
+          const text = cell.textContent || '';
+          const match = text.match(/(\d{4}-\d{2}-\d{2})/);
+          if (match) return match[1];
+        }
+        return '2024-05-17'; // fallback to known version
       });
 
-      for (const link of downloadLinks) {
+      // Now get the download link - look for the main DAT pack download
+      // The download is in the "Download" link in the first file row
+      const downloadInfo = await page.evaluate(() => {
+        // Find links that say "Download" near the date
+        const links = Array.from(document.querySelectorAll('a'));
+        for (const link of links) {
+          const text = link.textContent?.trim().toLowerCase() || '';
+          const href = link.getAttribute('href') || '';
+          if (text === 'download' && href) {
+            return { href, text: 'TOSEC DAT Pack' };
+          }
+        }
+        return null;
+      });
+
+      if (downloadInfo) {
         const dat: DAT = {
-          id: link.href || `tosec-${Date.now()}`,
+          id: `tosec-${versionDate}`,
           source: this.sourceName,
-          system: 'unknown',
-          datVersion: 'unknown',
+          system: 'tosec',
+          datVersion: versionDate,
           roms: [],
-          name: link.text?.trim() || 'Unknown',
-          description: link.href || '',
-          category: 'unknown',
-          format: 'unknown',
+          name: `TOSEC-v${versionDate}.zip`,
+          description: downloadInfo.href,
         };
         dats.push(dat);
         if (onEntry) onEntry(dat);
@@ -118,8 +130,12 @@ export class TosecFetcher extends AbstractFetcher {
       this.browser = await chromium.launch({ headless: true });
     }
 
-    const context = await this.browser.newContext();
-    return context.newPage();
+    if (!this.currentPage) {
+      const context = await this.browser.newContext();
+      this.currentPage = await context.newPage();
+    }
+
+    return this.currentPage;
   }
 
   /**
@@ -129,15 +145,7 @@ export class TosecFetcher extends AbstractFetcher {
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
+      this.currentPage = null;
     }
   }
-
-  /**
-   * Capture screenshot on error using context
-   */
-  async captureErrorScreenshot(outputPath: string, context: any): Promise<void> {
-    const pages = context?.pages();
-    if (pages && pages.length > 0) {
-      await pages[0].screenshot({ path: outputPath, fullPage: true });
-    }
-  }}
+}
