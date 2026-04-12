@@ -58,13 +58,13 @@ jobs:
       - name: Phase 1 - Fetch DATs
         env:
           GITHUB_OWNER: Mesh-ARKade
-        run: node dist/scripts/pipeline.js --source tosec --phase fetch
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase fetch
 
       - name: Phase 2 - Group DATs
-        run: node dist/scripts/pipeline.js --source tosec --phase group
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase group
 
       - name: Phase 3 - Train Dictionary
-        run: node dist/scripts/pipeline.js --source tosec --phase dict || echo "Dictionary skipped"
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase dict || echo "Dictionary skipped"
 
       - name: Auto-commit immutable dictionary
         run: |
@@ -79,16 +79,16 @@ jobs:
           fi
 
       - name: Phase 4 - Create JSONL
-        run: node dist/scripts/pipeline.js --source tosec --phase jsonl
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase jsonl
 
       - name: Phase 5 - Compress
-        run: node dist/scripts/pipeline.js --source tosec --phase compress
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase compress
 
       - name: Phase 6 - Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GITHUB_REPO: metadat-tosec
-        run: node dist/scripts/pipeline.js --source tosec --phase release
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase release
 
       # NOTE: No dispatch to metadat-main - it runs on twice-daily schedule (pull-based)
 
