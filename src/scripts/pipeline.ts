@@ -7,12 +7,12 @@
 
 import { parseArgs } from 'util';
 import fs from 'fs/promises';
-import { VersionTracker } from '../src/core/version-tracker.js';
-import { validateFile, checkExtension } from '../src/core/validator.js';
-import { compress } from '../src/core/compressor.js';
-import { GitHubReleaser } from '../src/core/releaser.js';
-import { DiscordNotifier } from '../src/core/notifier.js';
-import type { DAT, Artifact, PipelineEvent } from '../src/types/index.js';
+import { VersionTracker } from '../core/version-tracker.js';
+import { validateFile, checkExtension } from '../core/validator.js';
+import { compress } from '../core/compressor.js';
+import { GitHubReleaser } from '../core/releaser.js';
+import { DiscordNotifier } from '../core/notifier.js';
+import type { DAT, Artifact, PipelineEvent } from '../types/index.js';
 
 /**
  * Convert a string to a URL-safe slug
