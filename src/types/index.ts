@@ -32,6 +32,10 @@ export interface DAT {
   category?: string;
   /** Optional path to source file */
   filePath?: string;
+  /** Optional format (for TOSEC: ISO, Pix, Original) */
+  format?: string;
+  /** Optional name (for DAT file name) */
+  name?: string;
 }
 
 export interface GroupedDATs {
