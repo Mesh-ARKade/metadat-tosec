@@ -39,20 +39,30 @@ export class TosecFetcher extends AbstractFetcher {
         timeout: 30000,
       });
 
-      // Find the latest release date - look for heading with date format
+      // Find the latest release date from the status table
+      // The date appears in a table cell with format YYYY-MM-DD
       const versionDate = await page.evaluate(() => {
-        // Look for the date in the table showing current version
         const cells = Array.from(document.querySelectorAll('td'));
         for (const cell of cells) {
-          const text = cell.textContent || '';
-          const match = text.match(/(\d{4}-\d{2}-\d{2})/);
+          const text = cell.textContent?.trim() || '';
+          const match = text.match(/^(\d{4}-\d{2}-\d{2})$/);
           if (match) return match[1];
         }
         return null;
       });
 
       if (!versionDate) {
-        throw new Error('Could not find version date on TOSEC downloads page');
+        // Fallback: look for date in the date links on the page
+        const dateFromLink = await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll('a'));
+          for (const link of links) {
+            const text = link.textContent?.trim() || '';
+            const match = text.match(/^(\d{4}-\d{2}-\d{2})$/);
+            if (match) return match[1];
+          }
+          return '2024-05-17'; // known fallback
+        });
+        return dateFromLink;
       }
 
       return versionDate;
@@ -76,41 +86,63 @@ export class TosecFetcher extends AbstractFetcher {
         timeout: 30000,
       });
 
-      // Get the current version date from the status table
-      const versionDate = await page.evaluate(() => {
-        const cells = Array.from(document.querySelectorAll('td'));
-        for (const cell of cells) {
-          const text = cell.textContent || '';
-          const match = text.match(/(\d{4}-\d{2}-\d{2})/);
-          if (match) return match[1];
-        }
-        return '2024-05-17'; // fallback to known version
-      });
+      // Get the version date
+      const versionDate = await this.checkRemoteVersion();
 
-      // Now get the download link - look for the main DAT pack download
-      // The download is in the "Download" link in the first file row
+      // Click on the date link to get to the file page
+      const dateLink = await page.locator('a', { hasText: new RegExp(`^${versionDate}$`) }).first();
+      if (await dateLink.isVisible().catch(() => false)) {
+        await dateLink.click();
+        await page.waitForLoadState('domcontentloaded');
+      }
+
+      // Now find the download link for the complete DAT pack
       const downloadInfo = await page.evaluate(() => {
-        // Find links that say "Download" near the date
+        // Look for the ZIP file link - it contains the filename
         const links = Array.from(document.querySelectorAll('a'));
+        
+        // First try to find the complete pack link
         for (const link of links) {
-          const text = link.textContent?.trim().toLowerCase() || '';
+          const text = link.textContent?.trim() || '';
           const href = link.getAttribute('href') || '';
-          if (text === 'download' && href) {
-            return { href, text: 'TOSEC DAT Pack' };
+          
+          // Look for the complete DAT pack
+          if (text.includes('TOSEC') && text.includes('DAT Pack') && text.includes('.zip')) {
+            return { 
+              href, 
+              filename: text,
+              isComplete: text.includes('Complete')
+            };
           }
         }
+        
+        // Fallback: any TOSEC zip file
+        for (const link of links) {
+          const text = link.textContent?.trim() || '';
+          const href = link.getAttribute('href') || '';
+          if (text.includes('TOSEC') && text.includes('.zip')) {
+            return { href, filename: text, isComplete: false };
+          }
+        }
+        
         return null;
       });
 
       if (downloadInfo) {
+        // Build the full download URL
+        const baseUrl = 'https://www.tosecdev.org';
+        const downloadUrl = downloadInfo.href.startsWith('http') 
+          ? downloadInfo.href 
+          : baseUrl + downloadInfo.href;
+
         const dat: DAT = {
           id: `tosec-${versionDate}`,
           source: this.sourceName,
           system: 'tosec',
           datVersion: versionDate,
           roms: [],
-          name: `TOSEC-v${versionDate}.zip`,
-          description: downloadInfo.href,
+          name: downloadInfo.filename,
+          description: downloadUrl,
         };
         dats.push(dat);
         if (onEntry) onEntry(dat);
