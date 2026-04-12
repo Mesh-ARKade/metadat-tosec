@@ -49,7 +49,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Install curl (for notifications)
-        run: apt-get update && apt-get install -y curl
+        run: sudo apt-get update && sudo apt-get install -y curl
 
       - name: Build TypeScript
         run: npm run build
@@ -57,7 +57,7 @@ jobs:
       # === PIPELINE PHASES ===
       - name: Phase 1 - Fetch DATs
         env:
-          GITHUB_OWNER: Mesh-ARKane
+          GITHUB_OWNER: Mesh-ARKade
         run: node dist/scripts/pipeline-phase.js --source tosec --phase fetch
 
       - name: Phase 2 - Group DATs
