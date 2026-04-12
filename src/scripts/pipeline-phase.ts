@@ -13,8 +13,8 @@ import { VersionTracker } from '../core/version-tracker.js';
 import { GitHubReleaser } from '../core/releaser.js';
 import type { DAT, GroupedDATs, Artifact } from '../types/index.js';
 import { validatePipelineState } from '../types/index.js';
-import { NoIntroFetcher } from '../fetchers/no-intro-fetcher.js';
-import { NoIntroGroupStrategy } from '../strategies/no-intro-grouping.js';
+import { TosecFetcher } from '../fetchers/tosec-fetcher.js';
+import { TosecGroupingStrategy, groupDats } from '../strategies/tosec-grouping.js';
 
 type Phase = 'fetch' | 'group' | 'dict' | 'jsonl' | 'compress' | 'release';
 
@@ -86,7 +86,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
     case 'fetch': {
       console.log('[phase:fetch] Fetching DATs...');
       const versionTracker = new VersionTracker('./versions.json');
-      const fetcher = new NoIntroFetcher(versionTracker, outputDir);
+      const fetcher = new TosecFetcher(versionTracker);
       
       const shouldSkip = await fetcher.shouldSkip();
       if (shouldSkip) {
@@ -115,7 +115,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
         throw new Error('No DATs loaded - run fetch phase first');
       }
       
-      const groupStrategy = new NoIntroGroupStrategy();
+      const groupStrategy = new TosecGroupingStrategy();
       const groupedDats = groupStrategy.group(state.dats);
       const groupNames = Object.keys(groupedDats);
       

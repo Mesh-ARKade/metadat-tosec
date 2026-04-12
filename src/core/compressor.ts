@@ -166,3 +166,38 @@ export class ZstdCompressor {
     return trainDictionary(samples, dictionaryPath);
   }
 }
+// Immutable dictionary path
+const IMMUTABLE_DICT_PATH = 'src/data/catalog.dict';
+import fsSync from 'fs';
+
+/**
+ * Check if immutable dictionary exists (sync version for quick checks)
+ */
+export function hasImmutableDictionary(): boolean {
+  return fsSync.existsSync(IMMUTABLE_DICT_PATH);
+}
+
+/**
+ * Get immutable dictionary if available
+ */
+export async function getImmutableDictionary(): Promise<Buffer | null> {
+  try {
+    if (fsSync.existsSync(IMMUTABLE_DICT_PATH)) {
+      console.log(`[compressor] Using immutable dictionary: ${IMMUTABLE_DICT_PATH}`);
+      return await fs.readFile(IMMUTABLE_DICT_PATH);
+    }
+  } catch (err) {
+    console.warn(`[compressor] Failed to load immutable dictionary: ${(err as Error).message}`);
+  }
+  return null;
+}
+
+/**
+ * Compress with immutable dictionary placeholder
+ */
+export async function compressWithImmutableDict(
+  content: string,
+  outputPath: string
+): Promise<Artifact> {
+  return compress(content, outputPath);
+}

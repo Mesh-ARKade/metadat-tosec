@@ -5,7 +5,8 @@
  * @guarantee All DATs for a given manufacturer-system are grouped together
  */
 
-import type { DAT } from '../types/index.js';
+import type { DAT, GroupedDATs } from '../types/index.js';
+import type { IGroupStrategy } from '../contracts/igroup-strategy.js';
 
 export interface GroupResult {
   groups: Map<string, DAT[]>;
@@ -85,6 +86,31 @@ export function groupDats(dats: DAT[]): GroupResult {
   }
 
   return { groups };
+}
+
+/**
+ * Create a unique key for a DAT entry
+ */
+export class TosecGroupingStrategy implements IGroupStrategy {
+  group(dats: DAT[]): GroupedDATs {
+    const grouped: GroupedDATs = {};
+    
+    for (const dat of dats) {
+      const parsed = parseTosecFilename(dat.name || '');
+      const groupName = toGroupName(parsed.manufacturer, parsed.system);
+      
+      if (!grouped[groupName]) {
+        grouped[groupName] = [];
+      }
+      grouped[groupName].push(dat);
+    }
+    
+    return grouped;
+  }
+  
+  getStrategyName(): string {
+    return 'tosec';
+  }
 }
 
 /**
