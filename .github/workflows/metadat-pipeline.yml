@@ -2,33 +2,130 @@ name: METADAT Pipeline (TOSEC)
 
 on:
   schedule:
+    # Run weekly on Tuesday 7 AM CST (12:00 UTC)
     - cron: '0 12 * * 2'
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run mode (no release)'
+        required: false
+        default: 'false'
+        type: boolean
   pull_request:
     branches: [main]
 
 jobs:
   pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     
     steps:
-      - name: Checkout
+      # === SETUP ===
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
-      - name: Install deps
+      # === NOTIFY STARTED ===
+      - name: Notify started
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"⏩ TOSEC Pipeline Started\",\"description\":\"Fetching latest DATs from tosecdev.org...\",\"color\":16776960,\"url\":\"$GITHUB_SERVER_URL/Mesh-ARKade/metadat-tosec/actions/runs/$GITHUB_RUN_ID\",\"footer\":{\"text\":\"Mesh-ARKade/metadat-tosec\"}}]}"
+
+      # === BUILD ===
+      - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Install curl (for notifications)
+        run: apt-get update && apt-get install -y curl
+
+      - name: Build TypeScript
         run: npm run build
 
-      - name: Test TypeScript compiles
-        run: npx tsc --noEmit
+      # === PIPELINE PHASES ===
+      - name: Phase 1 - Fetch DATs
+        env:
+          GITHUB_OWNER: Mesh-ARKane
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase fetch
 
-      - name: Run tests
-        run: npm test || echo "Tests may need setup"
+      - name: Phase 2 - Group DATs
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase group
+
+      - name: Phase 3 - Train Dictionary
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase dict || echo "Dictionary skipped"
+
+      - name: Auto-commit immutable dictionary
+        run: |
+          if [[ `git status --porcelain src/data/catalog.dict` ]]; then
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add src/data/catalog.dict
+            git commit -m "chore: save immutable zstd dictionary [skip ci]"
+            git push
+          else
+            echo "No dictionary changes to commit."
+          fi
+
+      - name: Phase 4 - Create JSONL
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase jsonl
+
+      - name: Phase 5 - Compress
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase compress
+
+      - name: Phase 6 - Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_REPO: metadat-tosec
+        run: node dist/scripts/pipeline-phase.js --source tosec --phase release
+
+      # NOTE: No dispatch to metadat-main - it runs on twice-daily schedule (pull-based)
+
+      # === UPLOAD ARTIFACTS ===
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: output
+          path: |
+            output/*.jsonl.zst
+            output/manifest.json
+
+      # === UPLOAD ERROR SCREENSHOT ON FAILURE ===
+      - name: Upload error screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-error
+          path: output/tosec-error.png
+          retention-days: 7
+
+      # === NOTIFY RESULT ===
+      - name: Notify skipped
+        if: success() && env.SKIP_PIPELINE == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node dist/core/notifier.js skipped tosec || true
+
+      - name: Notify success
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node dist/core/notifier.js success tosec || true
+
+      - name: Notify failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PIPELINE_ERROR: "Pipeline failed. Check GitHub Actions Artifacts for screenshot."
+        run: node dist/core/notifier.js failure tosec || true
