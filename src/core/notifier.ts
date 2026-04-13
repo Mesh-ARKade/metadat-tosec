@@ -178,44 +178,13 @@ export class DiscordNotifier {
    * Format stats as fancy ASCII charts per S8 spec
    */
   private formatStatsTable(stats: Array<{ metric: string; value: string }>): string {
-    // Check if values are numeric for charts
-    const numericStats = stats.map(s => {
-      const num = parseInt(s.value.replace(/,/g, '').replace(/\s/g, ''));
-      return isNaN(num) ? null : { ...s, num };
-    }).filter(s => s !== null) as Array<{ metric: string; value: string; num: number }>;
+    const metricWidth = Math.max(...stats.map(s => s.metric.length));
+    const valueWidth = Math.max(...stats.map(s => s.value.length));
 
-    if (numericStats.length === 0) {
-      // Fallback to simple markdown table
-      const rows = stats.map(s => `| ${s.metric} | ${s.value} |`).join('\n');
-      return `\n${rows}\n`;
-    }
-
-    // Find max for bar chart scaling
-    const maxVal = Math.max(...numericStats.map(s => s.num));
-    const barLength = 12;
-    const metricWidth = 14;
-    const valueWidth = 10;
-
-    // Generate bar chart rows (no border frame)
     let chart = '\n```\n';
-
-    for (const stat of numericStats) {
-      const metric = stat.metric.length > metricWidth ? stat.metric.substring(0, metricWidth - 3) + '...' : stat.metric;
-      const barLen = Math.floor((stat.num / maxVal) * barLength);
-      const bar = '█'.repeat(barLen) + '░'.repeat(barLength - barLen);
-      chart += `${metric.padEnd(metricWidth)} ${bar} ${stat.value.padStart(valueWidth)}\n`;
+    for (const stat of stats) {
+      chart += `${stat.metric.padEnd(metricWidth)}  ${stat.value.padStart(valueWidth)}\n`;
     }
-
-    // Add non-numeric stats
-    const nonNumeric = stats.filter(s => isNaN(parseInt(s.value.replace(/,/g, ''))));
-    if (nonNumeric.length > 0) {
-      chart += '\n';
-      for (const stat of nonNumeric) {
-        const metric = stat.metric.length > metricWidth ? stat.metric.substring(0, metricWidth - 3) + '...' : stat.metric;
-        chart += `${metric.padEnd(metricWidth)} ${stat.value}\n`;
-      }
-    }
-
     chart += '```\n';
 
     return chart;
