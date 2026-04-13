@@ -98,7 +98,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
           process.exit(0);
         }
         
-        const dats = await fetcher.fetch();
+        const dats = await fetcher.fetchDats();
         console.log(`[phase:fetch] Fetched ${dats.length} games`);
         
         if (dats.length === 0) {
