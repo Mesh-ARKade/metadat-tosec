@@ -45,28 +45,32 @@ export class TosecGroupingStrategy implements IGroupStrategy {
    * Extract manufacturer from system name or filename
    * @param system System name from DAT
    * @param name Full filename
-   * @returns Lowercase manufacturer name
+   * @returns Lowercase manufacturer name (just the first word/company)
    */
   private extractManufacturer(system: string, name?: string): string {
-    // First try system (usually in "Manufacturer - System" format)
-    if (system) {
-      const separatorIndex = system.indexOf(' - ');
-      if (separatorIndex > 0) {
-        return system.substring(0, separatorIndex).toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      }
-    }
+    let manufacturer = '';
     
-    // Fallback: parse from filename
+    // Try to get manufacturer from name first (more reliable for TOSEC)
     if (name) {
       const parsed = parseTosecFilename(name);
-      if (parsed.manufacturer && parsed.manufacturer !== 'Unknown') {
-        return parsed.manufacturer.toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      manufacturer = parsed.manufacturer;
+    }
+    
+    // If still no manufacturer, try system
+    if (!manufacturer || manufacturer === 'Unknown') {
+      if (system) {
+        const parsed = parseTosecFilename(system);
+        manufacturer = parsed.manufacturer;
       }
     }
     
-    // Last resort: misc
+    // Extract just the first word (the company name) - e.g., "Acorn Archimedes" -> "acorn"
+    if (manufacturer && manufacturer !== 'Unknown') {
+      const firstWord = manufacturer.split(' ')[0].toLowerCase();
+      return firstWord.replace(/[^a-z0-9]+/g, '');
+    }
+    
+    // Fallback
     return 'misc';
   }
 

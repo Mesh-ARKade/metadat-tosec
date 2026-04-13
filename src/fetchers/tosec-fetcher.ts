@@ -210,7 +210,8 @@ export class TosecFetcher extends AbstractFetcher {
       return {
         id: `tosec-${fileName}`,
         source: 'tosec',
-        system: parsedFilename.system || fileName,
+        // Use full manufacturer+system for grouping: "Acorn Archimedes - Games"
+        system: `${parsedFilename.manufacturer} - ${parsedFilename.system}`,
         datVersion: version,
         name: fileName,
         description: parsedFilename.category || fileName,
