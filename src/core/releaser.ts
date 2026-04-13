@@ -168,9 +168,38 @@ export class GitHubReleaser {
       const assetCount = currentRelease.data.assets.length;
       
       if (assetCount >= 900) {
-        console.log(`[releaser] Release has ${assetCount} assets (near limit), creating new tag...`);
-        // Create fresh release instead of updating
-        return this.createRelease(tag + '-new', allArtifacts);
+        // Why: GitHub cap is 1,000 assets per release. When near-full, wipe all
+        // existing assets and re-upload the current batch rather than creating a
+        // new tag (which risks collision on repeated runs on the same day).
+        console.log(`[releaser] Release has ${assetCount} assets (near limit), clearing and re-uploading...`);
+        for (const asset of currentRelease.data.assets) {
+          await this.octokit.repos.deleteReleaseAsset({
+            owner: this.owner,
+            repo: this.repo,
+            asset_id: asset.id
+          });
+        }
+        const body = generateReleaseNotes(allArtifacts);
+        await this.octokit.repos.updateRelease({
+          owner: this.owner,
+          repo: this.repo,
+          release_id: currentRelease.data.id,
+          body
+        });
+        for (const artifact of artifacts) {
+          await this.uploadAsset(currentRelease.data.id, artifact);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        return {
+          tag: currentRelease.data.tag_name,
+          name: currentRelease.data.name || '',
+          body,
+          draft: currentRelease.data.draft,
+          prerelease: currentRelease.data.prerelease,
+          assets: [],
+          htmlUrl: currentRelease.data.html_url,
+          createdAt: currentRelease.data.created_at
+        };
       }
     }
     

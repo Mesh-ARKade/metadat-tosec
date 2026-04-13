@@ -276,26 +276,31 @@ export class DiscordNotifier {
   }
 }
 
-// CLI entry point
-if (require.main === module) {
+// CLI entry point — ESM-compatible (no require.main in ESM modules)
+const isMain = process.argv[1] && import.meta.url.endsWith(
+  process.argv[1].replace(/\\/g, '/')
+);
+
+if (isMain) {
   const args = process.argv.slice(2);
   const type = args[0] as 'success' | 'failure' | 'skipped' | 'started';
   const source = args[1] || 'unknown';
-  
+
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL || '';
   const statsJson = process.env.PIPELINE_STATS || '[]';
   const releaseUrl = process.env.PIPELINE_RELEASE_URL || '';
   const entries = parseInt(process.env.PIPELINE_ENTRIES || '0', 10);
   const artifacts = parseInt(process.env.PIPELINE_ARTIFACTS || '0', 10);
   const duration = parseInt(process.env.PIPELINE_DURATION || '0', 10);
-  
+  const error = process.env.PIPELINE_ERROR || '';
+
   if (!webhookUrl) {
     console.error('DISCORD_WEBHOOK_URL not set');
     process.exit(1);
   }
-  
+
   const notifier = new DiscordNotifier(webhookUrl);
-  
+
   const event: PipelineEvent = {
     type,
     source,
@@ -304,13 +309,14 @@ if (require.main === module) {
     releaseUrl,
     entryCount: entries,
     artifactCount: artifacts,
-    duration
+    duration,
+    ...(error && { error })
   };
-  
+
   notifier.notify(event)
     .then(() => console.log('Notification sent'))
     .catch(err => {
-      console.error('Notification failed:', err.message);
+      console.error('Notification failed:', (err as Error).message);
       process.exit(1);
     });
 }
