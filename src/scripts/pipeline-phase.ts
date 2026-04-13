@@ -35,6 +35,7 @@ interface PipelineState {
   dictPath?: string;
   // Counts saved before clearing large arrays
   datCount?: number;
+  romCount?: number;
   groupCount?: number;
   // Last release artifact SHA256s for incremental detection
   lastArtifacts?: Record<string, string>;
@@ -298,6 +299,9 @@ async function runPhase(options: PhaseOptions): Promise<void> {
       // Save counts before clearing large arrays
       state.datCount = groupNames.reduce((sum, g) => sum + (state.groupedDats?.[g]?.length || 0), 0);
       state.groupCount = groupNames.length;
+      state.romCount = groupNames.reduce((sum, g) => {
+        return sum + (state.groupedDats?.[g] || []).reduce((s, d) => s + (d.roms?.length || 0), 0);
+      }, 0);
 
       // Clean up state - don't save large DATs
       state.artifacts = artifacts;
@@ -357,7 +361,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
         
         const stats = [
           { metric: 'Total DATs', value: (state.datCount || 0).toLocaleString() },
-          { metric: 'DAT Files', value: totalEntries.toLocaleString() },
+          { metric: 'Total ROMs', value: (state.romCount || 0).toLocaleString() },
           { metric: 'Groups', value: (state.groupCount || 0).toString() },
           { metric: 'Artifacts', value: `${artifactsToUpload.length} new / ${unchangedCount} skip` },
           { metric: 'Upload', value: formatSize(uploadSize) },
