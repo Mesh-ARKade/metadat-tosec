@@ -288,6 +288,12 @@ if (isMain) {
   const duration = parseInt(process.env.PIPELINE_DURATION || '0', 10);
   const error = process.env.PIPELINE_ERROR || '';
 
+  // Construct action URL from standard GitHub Actions env vars
+  const githubRepo = process.env.GITHUB_REPOSITORY || 'Mesh-ARKade/metadat-tosec';
+  const runId = process.env.GITHUB_RUN_ID || '';
+  const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
+  const actionUrl = runId ? `${serverUrl}/${githubRepo}/actions/runs/${runId}` : '';
+
   if (!webhookUrl) {
     console.error('DISCORD_WEBHOOK_URL not set');
     process.exit(1);
@@ -301,6 +307,7 @@ if (isMain) {
     timestamp: new Date().toISOString(),
     stats: JSON.parse(statsJson),
     releaseUrl,
+    actionUrl,
     entryCount: entries,
     artifactCount: artifacts,
     duration,
