@@ -41,7 +41,7 @@ jobs:
         run: |
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"⏩ TOSEC Pipeline Started\",\"description\":\"Fetching latest DATs from tosecdev.org...\",\"color\":16776960,\"url\":\"$GITHUB_SERVER_URL/Mesh-ARKade/metadat-tosec/actions/runs/$GITHUB_RUN_ID\",\"footer\":{\"text\":\"Mesh-ARKade/metadat-tosec\"}}]}"
+            -d "{\"embeds\":[{\"title\":\"⏩ TOSEC Pipeline Started\",\"description\":\"Fetching latest DATs from tosecdev.org...\",\"color\":16776960,\"url\":\"$GITHUB_SERVER_URL/Mesh-ARKade/metadat-tosec/actions/runs/$GITHUB_RUN_ID\",\"fields\":[{\"name\":\"🔗 Links\",\"value\":\"[View Run]($GITHUB_SERVER_URL/Mesh-ARKade/metadat-tosec/actions/runs/$GITHUB_RUN_ID)\",\"inline\":false}],\"footer\":{\"text\":\"Mesh-ARKade/metadat-tosec\"}}]}"
 
       # === BUILD ===
       - name: Install dependencies
