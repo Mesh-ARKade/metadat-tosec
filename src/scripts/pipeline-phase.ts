@@ -301,6 +301,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
     }
     
     case 'release': {
+      const startTime = Date.now();
       console.log('[phase:release] Creating GitHub release...');
       if (!state.artifacts || state.artifacts.length === 0) {
         throw new Error('No artifacts - run compress phase first');
@@ -346,14 +347,14 @@ async function runPhase(options: PhaseOptions): Promise<void> {
         const savedSize = state.artifacts.filter(a => a.op === 'unchanged').reduce((sum, a) => sum + a.size, 0);
         
         const formatSize = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        const systemsCount = new Set(state.artifacts.flatMap(a => a.systems?.map(s => s.id) || [])).size;
         
         const stats = [
-          { metric: 'Total Games', value: totalEntries.toLocaleString() },
-          { metric: 'Systems', value: systemsCount.toString() },
+          { metric: 'Total DATs', value: (state.dats?.length || 0).toLocaleString() },
+          { metric: 'Total ROMs', value: totalEntries.toLocaleString() },
+          { metric: 'Manufacturers', value: Object.keys(state.groupedDats || {}).length.toString() },
           { metric: 'Artifacts', value: `${artifactsToUpload.length} new / ${unchangedCount} skip` },
-          { metric: 'Upload Vol', value: formatSize(uploadSize) },
-          { metric: 'Saved BW', value: formatSize(savedSize) },
+          { metric: 'Upload', value: formatSize(uploadSize) },
+          { metric: 'Saved', value: formatSize(savedSize) },
           { metric: 'Total Size', value: formatSize(totalSize) }
         ];
         
@@ -361,7 +362,8 @@ async function runPhase(options: PhaseOptions): Promise<void> {
           `PIPELINE_RELEASE_URL=${release.htmlUrl}`,
           `PIPELINE_ENTRIES=${totalEntries}`,
           `PIPELINE_ARTIFACTS=${state.artifacts.length}`,
-          `PIPELINE_STATS=${JSON.stringify(stats)}`
+          `PIPELINE_STATS=${JSON.stringify(stats)}`,
+          `PIPELINE_DURATION=${Date.now() - startTime}`
         ].join('\n') + '\n';
         
         await fs.appendFile(process.env.GITHUB_ENV, envContent);

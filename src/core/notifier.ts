@@ -175,11 +175,53 @@ export class DiscordNotifier {
   }
 
   /**
-   * Format stats as markdown table per S8 spec
+   * Format stats as fancy ASCII charts per S8 spec
    */
   private formatStatsTable(stats: Array<{ metric: string; value: string }>): string {
-    const rows = stats.map(s => `| ${s.metric} | ${s.value} |`).join('\n');
-    return `\n${rows}\n`;
+    // Check if values are numeric for charts
+    const numericStats = stats.map(s => {
+      const num = parseInt(s.value.replace(/,/g, '').replace(/\s/g, ''));
+      return isNaN(num) ? null : { ...s, num };
+    }).filter(s => s !== null) as Array<{ metric: string; value: string; num: number }>;
+
+    if (numericStats.length === 0) {
+      // Fallback to simple markdown table
+      const rows = stats.map(s => `| ${s.metric} | ${s.value} |`).join('\n');
+      return `\n${rows}\n`;
+    }
+
+    // Find max for bar chart scaling
+    const maxVal = Math.max(...numericStats.map(s => s.num));
+    const barLength = 20;
+
+    // Generate ASCII bar chart
+    let chart = '\n```\n';
+    chart += '╔═══════════════════════════════════════════════════════════╗\n';
+    chart += '║                    📊 STATS FOR NERDS 📊                   ║\n';
+    chart += '╠═══════════════════════════════════════════════════════════╣\n';
+
+    for (const stat of numericStats) {
+      // Truncate metric if too long
+      const metric = stat.metric.length > 20 ? stat.metric.substring(0, 17) + '...' : stat.metric;
+      const barLen = Math.floor((stat.num / maxVal) * barLength);
+      const bar = '█'.repeat(barLen) + '░'.repeat(barLength - barLen);
+      
+      chart += `║ ${metric.padEnd(20)} │${bar} │ ${stat.value.padStart(12)} ║\n`;
+    }
+
+    // Add non-numeric stats
+    const nonNumeric = stats.filter(s => isNaN(parseInt(s.value.replace(/,/g, ''))));
+    if (nonNumeric.length > 0) {
+      chart += '╠═══════════════════════════════════════════════════════════╣\n';
+      for (const stat of nonNumeric) {
+        chart += `║ ${stat.metric.padEnd(20)} │ ${stat.value.padStart(25)}    ║\n`;
+      }
+    }
+
+    chart += '╚═══════════════════════════════════════════════════════════╝\n';
+    chart += '```\n';
+
+    return chart;
   }
 
   /**
@@ -232,4 +274,43 @@ export class DiscordNotifier {
       throw err;
     }
   }
+}
+
+// CLI entry point
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  const type = args[0] as 'success' | 'failure' | 'skipped' | 'started';
+  const source = args[1] || 'unknown';
+  
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL || '';
+  const statsJson = process.env.PIPELINE_STATS || '[]';
+  const releaseUrl = process.env.PIPELINE_RELEASE_URL || '';
+  const entries = parseInt(process.env.PIPELINE_ENTRIES || '0', 10);
+  const artifacts = parseInt(process.env.PIPELINE_ARTIFACTS || '0', 10);
+  const duration = parseInt(process.env.PIPELINE_DURATION || '0', 10);
+  
+  if (!webhookUrl) {
+    console.error('DISCORD_WEBHOOK_URL not set');
+    process.exit(1);
+  }
+  
+  const notifier = new DiscordNotifier(webhookUrl);
+  
+  const event: PipelineEvent = {
+    type,
+    source,
+    timestamp: new Date().toISOString(),
+    stats: JSON.parse(statsJson),
+    releaseUrl,
+    entryCount: entries,
+    artifactCount: artifacts,
+    duration
+  };
+  
+  notifier.notify(event)
+    .then(() => console.log('Notification sent'))
+    .catch(err => {
+      console.error('Notification failed:', err.message);
+      process.exit(1);
+    });
 }
