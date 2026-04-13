@@ -42,35 +42,33 @@ export class TosecGroupingStrategy implements IGroupStrategy {
   }
 
   /**
-   * Extract manufacturer from system name or filename
+   * Extract group key from a DAT — first LETTER of the manufacturer.
+   *
+   * @intent Keep artifact count well under GitHub's 1,000-asset cap. TOSEC has
+   *         ~220+ unique manufacturer names, so grouping by first word produces
+   *         ~220 artifacts per run. Grouping by first letter caps it at 26.
    * @param system System name from DAT
-   * @param name Full filename
-   * @returns Lowercase manufacturer name (just the first word/company)
+   * @param name Full filename (preferred — more reliable for TOSEC)
+   * @returns Single lowercase letter (a–z) or 'misc' for non-alpha/unknown
    */
   private extractManufacturer(system: string, name?: string): string {
     let manufacturer = '';
-    
-    // Try to get manufacturer from name first (more reliable for TOSEC)
+
+    // Prefer filename — it carries the full TOSEC naming convention
     if (name) {
-      const parsed = parseTosecFilename(name);
-      manufacturer = parsed.manufacturer;
+      manufacturer = parseTosecFilename(name).manufacturer;
     }
-    
-    // If still no manufacturer, try system
+
     if (!manufacturer || manufacturer === 'Unknown') {
-      if (system) {
-        const parsed = parseTosecFilename(system);
-        manufacturer = parsed.manufacturer;
-      }
+      manufacturer = parseTosecFilename(system).manufacturer;
     }
-    
-    // Extract just the first word (the company name) - e.g., "Acorn Archimedes" -> "acorn"
+
     if (manufacturer && manufacturer !== 'Unknown') {
-      const firstWord = manufacturer.split(' ')[0].toLowerCase();
-      return firstWord.replace(/[^a-z0-9]+/g, '');
+      const firstChar = manufacturer[0].toLowerCase();
+      // Only a-z letters become group keys; numbers/symbols go to misc
+      if (/^[a-z]$/.test(firstChar)) return firstChar;
     }
-    
-    // Fallback
+
     return 'misc';
   }
 

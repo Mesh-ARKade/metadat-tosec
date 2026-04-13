@@ -98,34 +98,36 @@ describe('TosecGroupingStrategy', () => {
     expect(strategy.getStrategyName()).toBe('tosec');
   });
 
-  it('groups DATs with the same manufacturer together', () => {
+  it('groups DATs with the same first letter together', () => {
     const dats = [
       makeDat('Acorn Archimedes - Games', 'Acorn Archimedes - Games - [ADF] (TOSEC-v2024-05-17_CM)'),
       makeDat('Acorn BBC Micro - Games', 'Acorn BBC Micro - Games - [ADF] (TOSEC-v2024-05-17_CM)'),
+      makeDat('Amstrad - CPC - Games', 'Amstrad - CPC - Games (TOSEC-v2024-05-17_CM)'),
     ];
     const groups = strategy.group(dats);
-    // Both "Acorn Archimedes" and "Acorn BBC Micro" start with "Acorn" — first word only
+    // All start with 'A' → single group 'a'
     expect(Object.keys(groups)).toHaveLength(1);
-    expect(Object.keys(groups)[0]).toBe('acorn');
-    expect(groups['acorn']).toHaveLength(2);
+    expect(Object.keys(groups)[0]).toBe('a');
+    expect(groups['a']).toHaveLength(3);
   });
 
-  it('creates separate groups for different manufacturers', () => {
+  it('creates separate groups for different first letters', () => {
     const dats = [
       makeDat('Atari - 2600 - Games', 'Atari - 2600 - Games (TOSEC-v2023-11-01_CM)'),
       makeDat('Sega - Mega Drive - Games', 'Sega - Mega Drive - Games (TOSEC-v2023-11-01_CM)'),
     ];
     const groups = strategy.group(dats);
     expect(Object.keys(groups)).toHaveLength(2);
-    expect(groups['atari']).toHaveLength(1);
-    expect(groups['sega']).toHaveLength(1);
+    expect(groups['a']).toHaveLength(1);
+    expect(groups['s']).toHaveLength(1);
   });
 
   it('falls back to "misc" for DATs with no parseable manufacturer', () => {
-    const dats = [makeDat('unknown')];
+    // A DAT with system name that has no alphabetic first char goes to misc
+    const dats = [makeDat('3DO - Games', '3DO - Games (TOSEC-v2020-01-01_CM)')];
     const groups = strategy.group(dats);
-    // 'unknown' as first word → 'unknown' not 'misc' (unless it's truly empty)
     expect(Object.keys(groups)).toHaveLength(1);
+    expect(Object.keys(groups)[0]).toBe('misc');
   });
 
   it('handles an empty DAT array', () => {
@@ -133,12 +135,12 @@ describe('TosecGroupingStrategy', () => {
     expect(Object.keys(groups)).toHaveLength(0);
   });
 
-  it('group keys are lowercase with no special characters', () => {
+  it('group keys are single lowercase letters or misc', () => {
     const dats = [
       makeDat('Nintendo - Game Boy - Games', 'Nintendo - Game Boy - Games (TOSEC-v2025-01-10_CM)'),
     ];
     const groups = strategy.group(dats);
     const keys = Object.keys(groups);
-    expect(keys.every(k => /^[a-z0-9]+$/.test(k))).toBe(true);
+    expect(keys.every(k => /^[a-z]$/.test(k) || k === 'misc')).toBe(true);
   });
 });
