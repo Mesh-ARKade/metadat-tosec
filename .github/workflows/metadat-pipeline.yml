@@ -67,10 +67,13 @@ jobs:
         run: node dist/scripts/pipeline-phase.js --source tosec --phase dict || echo "Dictionary skipped"
 
       - name: Auto-commit immutable dictionary
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           if [[ `git status --porcelain src/data/catalog.dict` ]]; then
             git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
+            git remote set-url origin https://x-access-token:${RELEASE_TOKEN}@github.com/${{ github.repository }}.git
             git add src/data/catalog.dict
             git commit -m "chore: save immutable zstd dictionary [skip ci]"
             git push
