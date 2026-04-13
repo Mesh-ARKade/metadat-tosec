@@ -157,6 +157,23 @@ export class GitHubReleaser {
    */
   async createReleaseIncremental(tag: string, artifacts: Artifact[], allArtifacts: Artifact[] = artifacts): Promise<Release> {
     const exists = await this.releaseExists(tag);
+    
+    // If release exists and is nearly full (>900 assets), create new release instead
+    if (exists) {
+      const currentRelease = await this.octokit.repos.getReleaseByTag({
+        owner: this.owner,
+        repo: this.repo,
+        tag
+      });
+      const assetCount = currentRelease.data.assets.length;
+      
+      if (assetCount >= 900) {
+        console.log(`[releaser] Release has ${assetCount} assets (near limit), creating new tag...`);
+        // Create fresh release instead of updating
+        return this.createRelease(tag + '-new', allArtifacts);
+      }
+    }
+    
     let releaseResponse;
     if (exists) {
       releaseResponse = await this.octokit.repos.getReleaseByTag({
