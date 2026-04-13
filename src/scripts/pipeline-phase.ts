@@ -86,7 +86,7 @@ async function runPhase(options: PhaseOptions): Promise<void> {
     case 'fetch': {
       console.log('[phase:fetch] Fetching DATs...');
       const versionTracker = new VersionTracker('./versions.json');
-      const fetcher = new TosecFetcher(versionTracker);
+      const fetcher = new TosecFetcher(versionTracker, outputDir);
       
       try {
         const shouldSkip = await fetcher.shouldSkip();
@@ -107,8 +107,9 @@ async function runPhase(options: PhaseOptions): Promise<void> {
         
         state.dats = dats;
         await saveState(state, 'fetch');
-      } finally {
-        await fetcher.cleanup().catch(() => {});
+      } catch (err) {
+        console.error(`[phase:fetch] Error: ${(err as Error).message}`);
+        throw err;
       }
       break;
     }
