@@ -2,8 +2,8 @@ name: METADAT Pipeline (TOSEC)
 
 on:
   schedule:
-    # Run weekly on Tuesday 7 AM CST (12:00 UTC)
-    - cron: '0 12 * * 2'
+    # Run weekly on Wednesday 6 AM CST (12:00 UTC)
+    - cron: '0 12 * * 3'
   workflow_dispatch:
     inputs:
       dry-run:
