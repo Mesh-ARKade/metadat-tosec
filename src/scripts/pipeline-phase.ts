@@ -88,24 +88,28 @@ async function runPhase(options: PhaseOptions): Promise<void> {
       const versionTracker = new VersionTracker('./versions.json');
       const fetcher = new TosecFetcher(versionTracker);
       
-      const shouldSkip = await fetcher.shouldSkip();
-      if (shouldSkip) {
-        console.log('[phase:fetch] Already on latest version, skipping...');
-        if (process.env.GITHUB_ENV) {
-          await fs.appendFile(process.env.GITHUB_ENV, 'SKIP_PIPELINE=true\n');
+      try {
+        const shouldSkip = await fetcher.shouldSkip();
+        if (shouldSkip) {
+          console.log('[phase:fetch] Already on latest version, skipping...');
+          if (process.env.GITHUB_ENV) {
+            await fs.appendFile(process.env.GITHUB_ENV, 'SKIP_PIPELINE=true\n');
+          }
+          process.exit(0);
         }
-        process.exit(0);
+        
+        const dats = await fetcher.fetch();
+        console.log(`[phase:fetch] Fetched ${dats.length} games`);
+        
+        if (dats.length === 0) {
+          throw new Error('No DATs fetched');
+        }
+        
+        state.dats = dats;
+        await saveState(state, 'fetch');
+      } finally {
+        await fetcher.cleanup().catch(() => {});
       }
-      
-      const dats = await fetcher.fetch();
-      console.log(`[phase:fetch] Fetched ${dats.length} games`);
-      
-      if (dats.length === 0) {
-        throw new Error('No DATs fetched');
-      }
-      
-      state.dats = dats;
-      await saveState(state, 'fetch');
       break;
     }
     
