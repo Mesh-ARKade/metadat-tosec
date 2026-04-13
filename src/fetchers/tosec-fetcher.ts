@@ -263,12 +263,26 @@ export class TosecFetcher extends AbstractFetcher {
       const dats: DAT[] = [];
       for (const datPath of datFiles) {
         const dat = await this.parseDatFile(datPath, version);
-        if (dat && dat.roms.length > 0) {
+        // ALWAYS include the DAT - even if it has 0 roms
+        // FIREHOSE: capture everything, group later
+        if (dat) {
           dats.push(dat);
+        } else {
+          // Even if parsing failed, create a basic entry so we don't lose the file
+          const fileName = path.basename(datPath, '.dat');
+          dats.push({
+            id: `tosec-${fileName}`,
+            source: 'tosec',
+            system: fileName.split(' - ')[0] || 'unknown',
+            datVersion: version,
+            name: fileName,
+            description: 'Parsing failed - needs investigation',
+            roms: [],
+          });
         }
       }
 
-      console.log(`[tosec] Parsed ${dats.length} valid DATs with ${dats.reduce((sum, d) => sum + d.roms.length, 0)} total ROMs`);
+      console.log(`[tosec] Parsed ${dats.length} DAT entries (including empty ones)`);
 
       // Step 7: Update version tracking
       await this.updateVersion(version);

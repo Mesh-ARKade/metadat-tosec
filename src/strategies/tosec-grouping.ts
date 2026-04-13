@@ -21,13 +21,28 @@ export class TosecGroupingStrategy implements IGroupStrategy {
    * Group DATs by manufacturer
    * @param dats Array of DAT objects to group
    * @returns GroupedDATs map with manufacturer as key
+   * @description FIREHOSE: Captures all DATs including empty ones. Unknown patterns go to 'misc'.
    */
   group(dats: DAT[]): GroupedDATs {
     const groups: GroupedDATs = {};
+    let miscCount = 0;
 
     for (const dat of dats) {
-      // Extract manufacturer from system name: "Manufacturer - System" → manufacturer
-      const groupName = this.extractGroup(dat.system);
+      // FIREHOSE: Use system from DAT object, fallback to name parsing
+      let groupName = this.extractGroup(dat.system);
+      
+      // If system doesn't give us a good group, try parsing the name
+      if (groupName === 'misc' || groupName === 'unknown') {
+        const parsed = parseTosecFilename(dat.name || '');
+        groupName = this.extractGroup(parsed.manufacturer);
+        
+        // If still no good group, put in misc
+        if (groupName === 'misc' || groupName === 'unknown' || !groupName) {
+          miscCount++;
+          // FIREHOSE: Batch misc items to avoid too many small files
+          groupName = miscCount <= 500 ? 'misc-1' : 'misc-2';
+        }
+      }
 
       if (!groups[groupName]) {
         groups[groupName] = [];
@@ -43,8 +58,11 @@ export class TosecGroupingStrategy implements IGroupStrategy {
    * Extract group name from system name
    * @param systemName System name in format "Manufacturer - System"
    * @returns Lowercase manufacturer name suitable for URL/filename
+   * @description FIREHOSE: If parsing fails, use 'misc' as fallback
    */
   private extractGroup(systemName: string): string {
+    if (!systemName) return 'misc';
+    
     const separatorIndex = systemName.indexOf(' - ');
     if (separatorIndex > 0) {
       const manufacturer = systemName.substring(0, separatorIndex).toLowerCase();
@@ -52,8 +70,15 @@ export class TosecGroupingStrategy implements IGroupStrategy {
       return manufacturer.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     }
 
-    // Fallback: use full system name if no separator found
-    return systemName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // If no separator found, check if it looks like a valid group
+    // FIREHOSE: collect everything - put unknown patterns in misc
+    const cleaned = systemName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (cleaned.length > 2 && !cleaned.match(/^\d+$/)) {
+      return cleaned;
+    }
+    
+    // Too short or just numbers - put in misc
+    return 'misc';
   }
 
   /**
