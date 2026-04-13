@@ -319,16 +319,21 @@ function extractRomsFromGame(game: Record<string, unknown>): RomEntry[] {
 
     const romObj = rom as Record<string, unknown>;
 
+    // fast-xml-parser uses attributeNamePrefix '@_' for all XML attributes
     const entry: RomEntry = {
-      name: String(romObj.name || romObj['@_name'] || ''),
-      size: Number(romObj.size) || 0,
+      name: String(romObj['@_name'] || romObj.name || ''),
+      size: Number(romObj['@_size'] || romObj.size) || 0,
     };
 
     // Add checksums if present
-    if (romObj.crc) entry.crc = String(romObj.crc);
-    if (romObj.md5) entry.md5 = String(romObj.md5);
-    if (romObj.sha1) entry.sha1 = String(romObj.sha1);
-    if (romObj.sha256) entry.sha256 = String(romObj.sha256);
+    const crc = romObj['@_crc'] || romObj.crc;
+    const md5 = romObj['@_md5'] || romObj.md5;
+    const sha1 = romObj['@_sha1'] || romObj.sha1;
+    const sha256 = romObj['@_sha256'] || romObj.sha256;
+    if (crc) entry.crc = String(crc);
+    if (md5) entry.md5 = String(md5);
+    if (sha1) entry.sha1 = String(sha1);
+    if (sha256) entry.sha256 = String(sha256);
 
     if (entry.name) {
       roms.push(entry);
