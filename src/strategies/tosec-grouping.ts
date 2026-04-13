@@ -18,31 +18,18 @@ import { IGroupStrategy } from '../contracts/igroup-strategy.js';
  */
 export class TosecGroupingStrategy implements IGroupStrategy {
   /**
-   * Group DATs by manufacturer
+   * Group DATs by manufacturer ONLY
    * @param dats Array of DAT objects to group
    * @returns GroupedDATs map with manufacturer as key
-   * @description FIREHOSE: Captures all DATs including empty ones. Unknown patterns go to 'misc'.
+   * @description FIREHOSE: Aggressive grouping - manufacturer only, not manufacturer+system
    */
   group(dats: DAT[]): GroupedDATs {
     const groups: GroupedDATs = {};
-    let miscCount = 0;
 
     for (const dat of dats) {
-      // FIREHOSE: Use system from DAT object, fallback to name parsing
-      let groupName = this.extractGroup(dat.system);
-      
-      // If system doesn't give us a good group, try parsing the name
-      if (groupName === 'misc' || groupName === 'unknown') {
-        const parsed = parseTosecFilename(dat.name || '');
-        groupName = this.extractGroup(parsed.manufacturer);
-        
-        // If still no good group, put in misc
-        if (groupName === 'misc' || groupName === 'unknown' || !groupName) {
-          miscCount++;
-          // FIREHOSE: Batch misc items to avoid too many small files
-          groupName = miscCount <= 500 ? 'misc-1' : 'misc-2';
-        }
-      }
+      // FIREHOSE: Group by manufacturer ONLY to avoid asset limit
+      // "Acorn Archimedes - Games" + "Acorn BBC Micro - Games" = "acorn"
+      const groupName = this.extractManufacturer(dat.system, dat.name);
 
       if (!groups[groupName]) {
         groups[groupName] = [];
@@ -55,29 +42,31 @@ export class TosecGroupingStrategy implements IGroupStrategy {
   }
 
   /**
-   * Extract group name from system name
-   * @param systemName System name in format "Manufacturer - System"
-   * @returns Lowercase manufacturer name suitable for URL/filename
-   * @description FIREHOSE: If parsing fails, use 'misc' as fallback
+   * Extract manufacturer from system name or filename
+   * @param system System name from DAT
+   * @param name Full filename
+   * @returns Lowercase manufacturer name
    */
-  private extractGroup(systemName: string): string {
-    if (!systemName) return 'misc';
-    
-    const separatorIndex = systemName.indexOf(' - ');
-    if (separatorIndex > 0) {
-      const manufacturer = systemName.substring(0, separatorIndex).toLowerCase();
-      // Convert to kebab-case for filename safety
-      return manufacturer.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    }
-
-    // If no separator found, check if it looks like a valid group
-    // FIREHOSE: collect everything - put unknown patterns in misc
-    const cleaned = systemName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    if (cleaned.length > 2 && !cleaned.match(/^\d+$/)) {
-      return cleaned;
+  private extractManufacturer(system: string, name?: string): string {
+    // First try system (usually in "Manufacturer - System" format)
+    if (system) {
+      const separatorIndex = system.indexOf(' - ');
+      if (separatorIndex > 0) {
+        return system.substring(0, separatorIndex).toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
     }
     
-    // Too short or just numbers - put in misc
+    // Fallback: parse from filename
+    if (name) {
+      const parsed = parseTosecFilename(name);
+      if (parsed.manufacturer && parsed.manufacturer !== 'Unknown') {
+        return parsed.manufacturer.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+    }
+    
+    // Last resort: misc
     return 'misc';
   }
 
