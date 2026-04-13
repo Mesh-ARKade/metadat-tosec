@@ -33,6 +33,9 @@ interface PipelineState {
   groupedDats?: GroupedDATs;
   artifacts?: Artifact[];
   dictPath?: string;
+  // Counts saved before clearing large arrays
+  datCount?: number;
+  groupCount?: number;
   // Last release artifact SHA256s for incremental detection
   lastArtifacts?: Record<string, string>;
 }
@@ -292,6 +295,10 @@ async function runPhase(options: PhaseOptions): Promise<void> {
       await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
       console.log('[phase:compress] Created: manifest.json');
       
+      // Save counts before clearing large arrays
+      state.datCount = groupNames.reduce((sum, g) => sum + (state.groupedDats?.[g]?.length || 0), 0);
+      state.groupCount = groupNames.length;
+
       // Clean up state - don't save large DATs
       state.artifacts = artifacts;
       state.dats = undefined;
@@ -349,9 +356,9 @@ async function runPhase(options: PhaseOptions): Promise<void> {
         const formatSize = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2) + ' MB';
         
         const stats = [
-          { metric: 'Total DATs', value: (state.dats?.length || 0).toLocaleString() },
-          { metric: 'Total ROMs', value: totalEntries.toLocaleString() },
-          { metric: 'Manufacturers', value: Object.keys(state.groupedDats || {}).length.toString() },
+          { metric: 'Total DATs', value: (state.datCount || 0).toLocaleString() },
+          { metric: 'DAT Files', value: totalEntries.toLocaleString() },
+          { metric: 'Groups', value: (state.groupCount || 0).toString() },
           { metric: 'Artifacts', value: `${artifactsToUpload.length} new / ${unchangedCount} skip` },
           { metric: 'Upload', value: formatSize(uploadSize) },
           { metric: 'Saved', value: formatSize(savedSize) },

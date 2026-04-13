@@ -192,33 +192,45 @@ export class DiscordNotifier {
 
     // Find max for bar chart scaling
     const maxVal = Math.max(...numericStats.map(s => s.num));
-    const barLength = 20;
+    const barLength = 12;
+    const metricWidth = 14;
+    const valueWidth = 10;
+    // Row width: 2 + metricWidth + 2 + barLength + 3 + valueWidth + 2 = 45 for defaults
+    const borderWidth = 2 + metricWidth + 2 + barLength + 3 + valueWidth + 2;
+    const inner = borderWidth - 2; // without corner chars
+    const border = '═'.repeat(inner);
 
     // Generate ASCII bar chart
     let chart = '\n```\n';
-    chart += '╔═══════════════════════════════════════════════════════════╗\n';
-    chart += '║                    📊 STATS FOR NERDS 📊                   ║\n';
-    chart += '╠═══════════════════════════════════════════════════════════╣\n';
+    chart += `╔${border}╗\n`;
+    const title = '📊 PIPELINE STATS 📊';
+    const pad = Math.max(0, inner - title.length);
+    const lpad = Math.floor(pad / 2);
+    const rpad = pad - lpad;
+    chart += `║${' '.repeat(lpad)}${title}${' '.repeat(rpad)}║\n`;
+    chart += `╠${border}╣\n`;
 
     for (const stat of numericStats) {
       // Truncate metric if too long
-      const metric = stat.metric.length > 20 ? stat.metric.substring(0, 17) + '...' : stat.metric;
+      const metric = stat.metric.length > metricWidth ? stat.metric.substring(0, metricWidth - 3) + '...' : stat.metric;
       const barLen = Math.floor((stat.num / maxVal) * barLength);
       const bar = '█'.repeat(barLen) + '░'.repeat(barLength - barLen);
-      
-      chart += `║ ${metric.padEnd(20)} │${bar} │ ${stat.value.padStart(12)} ║\n`;
+
+      chart += `║ ${metric.padEnd(metricWidth)} │${bar} │ ${stat.value.padStart(valueWidth)} ║\n`;
     }
 
     // Add non-numeric stats
     const nonNumeric = stats.filter(s => isNaN(parseInt(s.value.replace(/,/g, ''))));
     if (nonNumeric.length > 0) {
-      chart += '╠═══════════════════════════════════════════════════════════╣\n';
+      chart += `╠${border}╣\n`;
       for (const stat of nonNumeric) {
-        chart += `║ ${stat.metric.padEnd(20)} │ ${stat.value.padStart(25)}    ║\n`;
+        const metric = stat.metric.length > metricWidth ? stat.metric.substring(0, metricWidth - 3) + '...' : stat.metric;
+        const valWidth = inner - metricWidth - 4; // 4 = ' │ ' + trailing space
+        chart += `║ ${metric.padEnd(metricWidth)} │ ${stat.value.padStart(valWidth)} ║\n`;
       }
     }
 
-    chart += '╚═══════════════════════════════════════════════════════════╝\n';
+    chart += `╚${border}╝\n`;
     chart += '```\n';
 
     return chart;
