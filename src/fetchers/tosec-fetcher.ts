@@ -16,6 +16,7 @@ import { AbstractFetcher, type FetcherOptions } from '../base/base-fetcher.js';
 import { VersionTracker } from '../core/version-tracker.js';
 import type { DAT, RomEntry } from '../types/index.js';
 import { extractGameEntries } from '../core/validator.js';
+import { parseTosecFilename } from '../strategies/tosec-grouping.js';
 
 /**
  * TOSEC downloads page URL
@@ -297,46 +298,6 @@ export class TosecFetcher extends AbstractFetcher {
       await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     }
   }
-}
-
-/**
- * Parse TOSEC filename to extract components
- * Format: {Manufacturer} {System} - {Category} - [{Format}] (TOSEC-v{VERSION}_CM).dat
- * @param filename TOSEC DAT filename
- * @returns Parsed components
- */
-export function parseTosecFilename(filename: string): {
-  manufacturer: string;
-  system: string;
-  category: string;
-  format: string;
-  version: string;
-} {
-  // Remove .dat extension
-  const name = filename.replace(/\.dat$/i, '');
-
-  // Extract version: TOSEC-v{YYYY-MM-DD}
-  const versionMatch = name.match(/TOSEC-v(\d{4}-\d{2}-\d{2})/);
-  const version = versionMatch ? versionMatch[1] : 'unknown';
-
-  // Extract format: [format] e.g., [ADF], [DSK], [ISO]
-  const formatMatch = name.match(/\[([^\]]+)\]/);
-  const format = formatMatch ? formatMatch[1] : '';
-
-  // Remove version and format to parse manufacturer/system/category
-  let base = name
-    .replace(/TOSEC-v\d{4}-\d{2}-\d{2}[^)]*\)?/g, '')
-    .replace(/\s*\[[^\]]+\]\s*/g, '')
-    .trim();
-
-  // Split by " - " to get manufacturer, system, category
-  const parts = base.split(' - ').map(p => p.trim()).filter(p => p);
-
-  const manufacturer = parts[0] || 'Unknown';
-  const system = parts[1] || manufacturer;
-  const category = parts[2] || 'Unknown';
-
-  return { manufacturer, system, category, format, version };
 }
 
 /**

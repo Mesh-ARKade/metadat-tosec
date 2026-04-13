@@ -109,10 +109,12 @@ export function parseTosecFilename(filename: string): {
   const formatMatch = name.match(/\[([^\]]+)\]/);
   const format = formatMatch ? formatMatch[1] : '';
 
-  // Remove version and format to parse manufacturer/system/category
+  // Remove the full TOSEC version parenthetical (including the opening paren)
+  // e.g. " (TOSEC-v2024-05-17_CM)" → ""
   let base = name
-    .replace(/TOSEC-v\d{4}-\d{2}-\d{2}[^)]*\)?/g, '')
+    .replace(/\s*\(TOSEC-v\d{4}-\d{2}-\d{2}[^)]*\)/g, '')
     .replace(/\s*\[[^\]]+\]\s*/g, '')
+    .replace(/\s*-\s*$/g, '') // strip trailing " -" left after bracket removal
     .trim();
 
   // Split by " - " to get manufacturer, system, category
@@ -120,7 +122,8 @@ export function parseTosecFilename(filename: string): {
 
   const manufacturer = parts[0] || 'Unknown';
   const system = parts[1] || manufacturer;
-  const category = parts[2] || 'Unknown';
+  // Fall back to format (e.g. 'ADF') when no explicit category part exists
+  const category = parts[2] || format || 'Unknown';
 
   return { manufacturer, system, category, format, version };
 }
